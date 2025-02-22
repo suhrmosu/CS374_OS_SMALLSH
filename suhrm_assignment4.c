@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 /*
     Program Name: Assignment 4: SMALLSH
@@ -64,6 +66,16 @@ int main(int argc, char *argv[]) {
         // // The first child process will execute this branch
         // printf("First child's pid = %d\n", getpid());
         // sleep(10);
+      } else {
+        // this is to wait for the fork first child to finish/ return, passing the firstChild PID value
+        // printf("Child's pid = %d\n", firstChild);
+        firstChild = waitpid(firstChild, &childStatus, 0);
+        // printf("waitpid returned value %d\n", firstChild);
+        if(WIFEXITED(childStatus)){
+          printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
+        } else{
+          printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
+        }
       }
 
 
