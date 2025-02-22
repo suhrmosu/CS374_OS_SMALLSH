@@ -25,3 +25,77 @@
     // URL: https://canvas.oregonstate.edu/courses/1987883/assignments/9864854?module_item_id=24956222
     // provided code sourced, reviewed, and adapted for code functionality
 */
+
+int main(int argc, char *argv[]) {
+  char userName[32];
+  char *newargv[] = { "hello_world", NULL, NULL }; // file, input (command), list NULL terminator
+  int choice = 0;
+
+  int childStatus; 
+  printf("Parent process's pid = %d\n", getpid()); 
+
+  // do while loop to request user desired functionality, or exit; re-request invalid integers
+  do {
+    // Print User Options
+    printf("1. Enter cmd to process\n");
+    printf("2. Exit the program\n\n");
+    // Print request line and scan to integer variable
+    printf("Enter a choice 1 or 2: ");
+    scanf("%d", &choice);
+    if ((choice < 1) || (choice > 2)) {
+      printf("You entered an incorrect choice. Try again.\n\n");
+    } else if ((choice == 1)) {
+      printf(": ");
+      scanf("%s", userName);
+      // Put the userName as element 1
+      newargv[1] = userName;
+
+      pid_t firstChild = fork();
+
+      if (firstChild == -1) {
+        perror("fork() failed!");
+        exit(EXIT_FAILURE);
+      } else if(firstChild == 0){
+        // Now use execv to run "hello_world"
+        execv("hello_world", newargv);
+        /* execve() returns only on error */
+        perror("execv");
+        exit(EXIT_FAILURE);
+        // // The first child process will execute this branch
+        // printf("First child's pid = %d\n", getpid());
+        // sleep(10);
+      }
+
+
+      // // Now use execv to run "hello_world"
+      // execv("hello_world", newargv);
+      // /* execve() returns only on error */
+      // perror("execv");
+      // exit(EXIT_FAILURE);
+
+        // // Process movies in select file for each year released
+        // printf("\n");       // format matching add new line before file processing request
+        // selectFile();       // process select file function
+        // printf("\n");       // format matching add new line following file processing
+      
+    } else if ((choice == 2)) {
+        break;              // Exit from the program
+    }
+  } while ((choice != 2));
+
+  printf("The process with pid %d is exiting\n", getpid());
+  return EXIT_SUCCESS;
+  // return 0;                   // Return: integer 0 confirmation success
+
+  // printf(": ");
+  // scanf("%s", userName);
+  // // Put the userName as element 1
+  // newargv[1] = userName;
+  // // Now use execv to run "hello_world"
+  // execv("hello_world", newargv);
+  // /* execve() returns only on error */
+  // perror("execv");
+  // exit(EXIT_FAILURE);
+}
+
+  
