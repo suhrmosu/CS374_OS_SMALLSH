@@ -179,7 +179,9 @@ struct command_line *parse_input()
   if (!strcmp(&input[0] , "\n")) { // ! is providing this is true
     curr_command->new_ln = true;
     return curr_command;
-    printf("rainbow "); 
+  } else if (!strncmp(&input[0] , "#", 1)) {
+    curr_command->new_ln = true;
+    return curr_command;
   }
 
 	// Tokenize the input
