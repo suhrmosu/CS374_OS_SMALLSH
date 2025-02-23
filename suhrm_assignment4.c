@@ -47,6 +47,9 @@ struct command_line
 	char *output_file;
 	bool is_bg;
   bool new_ln;
+  bool exit;
+  bool stat;
+  bool change_wd;
 };
 
 struct command_line *parse_input();
@@ -182,7 +185,13 @@ struct command_line *parse_input()
   } else if (!strncmp(&input[0] , "#", 1)) {
     curr_command->new_ln = true;
     return curr_command;
-  }
+  } 
+  // else if (!strncmp(&input[0] , "cd",2)) {
+  //   // printf("change p");
+  //   curr_command->change_wd = true;
+  //   // curr_command->new_ln = true;
+  //   // return curr_command;
+  // }
 
 	// Tokenize the input
 	char *token = strtok(input, " \n");
@@ -193,6 +202,13 @@ struct command_line *parse_input()
 			curr_command->output_file = strdup(strtok(NULL," \n"));
 		} else if (!strcmp(token,"&")) {
 			curr_command->is_bg = true;
+		} else if (!strcmp(token,"exit")) {
+			curr_command->exit = true;
+		} else if (!strcmp(token,"status")) {
+			curr_command->stat = true;
+		} else if (!strcmp(token,"cd")) {
+			printf("change p \n");
+      curr_command->change_wd = true;
 		} 
     // else if(strcmp(token,"\n")){
 		// 	printf("rainbow;)");
@@ -225,8 +241,10 @@ int main()
 	struct command_line *curr_command;
   int childStatus; 
   char* newLine = "\n";
-  
-	while(true)
+  bool active_sh = true;
+  int exit_stat = 0;
+
+	while(active_sh)
 	{
 		curr_command = parse_input();
     // need to parse what the input is here
@@ -239,9 +257,34 @@ int main()
     // if ( !strcmp(curr_command->argv[0], newLine)) { 
     //   printf("Newly WED ;*) \n");
     
-    if ( (curr_command->new_ln)) { 
-      printf("Newly WED ;*) \n");
+    if ( (curr_command->new_ln) ) { 
+      // pass to new line on { \n } or { # }
+      // printf("New line ;*) \n");
+    } else if ( (curr_command->exit) ) { 
+      // exit loop
+      active_sh = false;
+      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
+      // printf("%s in parent is %s\n", "PWD", getenv("PWD"));
+    } else if ( (curr_command->stat) ) { 
+      // display status last command (or 0 if none yet)
+      printf("exit value %d \n", exit_stat);
+    } else if ( (curr_command->change_wd) ) { 
+      // change working directory
+      if (curr_command->argv[0]) {
+        setenv("PWD", curr_command->argv[0], 1);
+      } else {
+        setenv("PWD", getenv("HOME"), 1);
+      }
+      chdir(getenv("PWD")); 
+      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
+      printf("%s in parent is %s\n", "PWD", getenv("PWD"));
+
+      // chdir("/workspaces/CS374_OS_SMALLSH/CS344"); 
+      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
+      // printf("%s in parent is %s\n", "PWD", getenv("PWD"));
     } else {
+      // Executing Other Commands:
+      // utilizing 3 built-in command by using fork(), exec() and waitpid()
 
       char *newargv[] = { curr_command->argv[0], curr_command->argv[1], NULL };
 
@@ -252,11 +295,18 @@ int main()
         exit(EXIT_FAILURE);
       } else if(firstChild == 0) {
         // char *newargv[] = { "/bin/ls", "-al", NULL }; // works instantly when passed as constant 
-        execv(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        
+        // execv(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        // execv("/bin/ls", newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        // utilizing the p argument will search path for file input as first argument
+        execvp(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        
         // Now use execv to run "hello_world"
         //execv("hello_world", newargv);
         /* execve() returns only on error */
-        perror("execv");
+
+        // perror("execv");
+        perror(newargv[0]);
         exit(EXIT_FAILURE);
         // // The first child process will execute this branch
         // printf("First child's pid = %d\n", getpid());
@@ -265,12 +315,16 @@ int main()
         // this is to wait for the fork first child to finish/ return, passing the firstChild PID value
         // printf("Child's pid = %d\n", firstChild);
         firstChild = waitpid(firstChild, &childStatus, 0);
+        // set status from finished command
+        exit_stat =  WEXITSTATUS(childStatus);
+
         // printf("waitpid returned value %d\n", firstChild);
         if(WIFEXITED(childStatus)){
           printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
         } else{
           printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
         }
+        //
       }
     }
 	}
