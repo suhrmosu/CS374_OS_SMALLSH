@@ -50,6 +50,8 @@ struct command_line
   bool exit;
   bool stat;
   bool change_wd;
+  bool re_in;
+  bool re_ot;
 };
 
 struct command_line *parse_input();
@@ -100,8 +102,10 @@ struct command_line *parse_input()
 	char *token = strtok(input, " \n");
 	while(token){
 		if ( !strcmp(token,"<") ) {
+      curr_command->re_in = true;
 			curr_command->input_file = strdup(strtok(NULL," \n"));
 		} else if (!strcmp(token,">")) {
+      curr_command->re_ot = true;
 			curr_command->output_file = strdup(strtok(NULL," \n"));
 		} else if (!strcmp(token,"&")) {
 			curr_command->is_bg = true;
@@ -191,18 +195,66 @@ int main()
 
       char *newargv[] = { curr_command->argv[0], curr_command->argv[1], NULL };
 
+      
+      // fork off child process to call exec()
       pid_t firstChild = fork();
 
       if (firstChild == -1) {
         perror("fork() failed!");
         exit(EXIT_FAILURE);
       } else if(firstChild == 0) {
+        // This is the child fork process
+
+        // redirect I/O
+        if (curr_command->re_in) {
+          // set input file from struct
+          int sourceFD = open(curr_command->input_file, O_RDONLY);
+          if (sourceFD == -1) { 
+            perror("source open()"); 
+            exit(1); 
+          }
+          fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
+
+          // Write the file descriptor to stdout
+          printf("File descriptor of input file = %d\n", sourceFD); 
+
+          // Redirect stdin to source file
+          int result = dup2(sourceFD, 0);
+          if (result == -1) { 
+            perror("source dup2()"); 
+            exit(2); 
+          }
+        }
+        if (curr_command->re_ot) {
+          // set output file from struct
+          int targetFD = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+          if (targetFD == -1) { 
+            perror("target open()"); 
+            exit(1); 
+          }
+
+          fcntl(targetFD, F_SETFD, FD_CLOEXEC);
+
+          // Write the file descriptor to stdout
+          printf("File descriptor of output file = %d\n", targetFD);
+          
+          // Redirect stdout to target file
+          int result = dup2(targetFD, 1);
+          if (result == -1) { 
+            perror("target dup2()"); 
+            exit(2); 
+          }
+        }
+
+
         // char *newargv[] = { "/bin/ls", "-al", NULL }; // works instantly when passed as constant 
         
         // execv(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
         // execv("/bin/ls", newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+
         // utilizing the p argument will search path for file input as first argument
-        execvp(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        execvp(newargv[0], newargv); 
+        // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
         
         // Now use execv to run "hello_world"
         //execv("hello_world", newargv);
