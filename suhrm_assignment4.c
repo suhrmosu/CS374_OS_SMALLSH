@@ -64,9 +64,9 @@ struct command_line *parse_input();
     Tokenizes a line of character-string user-input data;
     Parses the string into appropriate structure data types;
     catches special symbols <, > and & , conditionally encodes behavior;
-    Arguments: 
-        char* currLine: the character pointer to the line data string
-        char* newDir: the character pointer to the newly created directory name string for this file
+    command syntax as follows, requested from user in-function
+      command [arg1 arg2 ...] [< input_file] [> output_file] [&]
+    Arguments: none
     Returns: 
       struct command_line *parse_input: the command line struct pointer is returned
 
@@ -114,12 +114,8 @@ struct command_line *parse_input()
 		} else if (!strcmp(token,"status")) {
 			curr_command->stat = true;
 		} else if (!strcmp(token,"cd")) {
-			// printf("change p \n");
       curr_command->change_wd = true;
 		} 
-    // else if(strcmp(token,"\n")){
-		// 	printf("rainbow;)");
-		// } 
     else {
 			curr_command->argv[curr_command->argc++] = strdup(token);
 		}
@@ -157,12 +153,6 @@ int main()
     // need to parse what the input is here
       // if (blank line) (# comment with pound) { skip to next re-prompt : } // PASS
       // else if (parsed input) { fork and pass to child to execv } // PROCESS
-
-    // printf("%s",curr_command->argv[0]);
-
-    // char* first = curr_command->argv[0];
-    // if ( !strcmp(curr_command->argv[0], newLine)) { 
-    //   printf("Newly WED ;*) \n");
     
     if ( (curr_command->new_ln) ) { 
       // pass to new line on { \n } or { # }
@@ -170,32 +160,21 @@ int main()
     } else if ( (curr_command->exit) ) { 
       // exit loop
       active_sh = false;
-      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
-      // printf("%s in parent is %s\n", "PWD", getenv("PWD"));
     } else if ( (curr_command->stat) ) { 
       // display status last command (or 0 if none yet)
       printf("exit value %d \n", exit_stat);
     } else if ( (curr_command->change_wd) ) { 
-      // change working directory
+      // change working directory, set as PWD
       if (curr_command->argv[0]) {
         setenv("PWD", curr_command->argv[0], 1);
       } else {
         setenv("PWD", getenv("HOME"), 1);
       }
       chdir(getenv("PWD")); 
-      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
-      // printf("%s in parent is %s\n", "PWD", getenv("PWD"));
-
-      // chdir("/workspaces/CS374_OS_SMALLSH/CS344"); 
-      // setenv("PWD", "/workspaces/CS374_OS_SMALLSH/CS344", 1);
-      // printf("%s in parent is %s\n", "PWD", getenv("PWD"));
     } else {
       // Executing Other Commands:
       // utilizing 3 built-in command by using fork(), exec() and waitpid()
 
-      char *newargv[] = { curr_command->argv[0], curr_command->argv[1], NULL };
-
-      
       // fork off child process to call exec()
       pid_t firstChild = fork();
 
@@ -225,6 +204,7 @@ int main()
             exit(2); 
           }
         }
+        // if not re_in && is_bg --> { standard input must be redirected to /dev/null. }
         if (curr_command->re_ot) {
           // set output file from struct
           int targetFD = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -245,41 +225,38 @@ int main()
             exit(2); 
           }
         }
-
-
-        // char *newargv[] = { "/bin/ls", "-al", NULL }; // works instantly when passed as constant 
-        
-        // execv(newargv[0], newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
-        // execv("/bin/ls", newargv); // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
+        // if not re_ot && is_bg --> { standard output must be redirected to /dev/null. }
 
         // utilizing the p argument will search path for file input as first argument
-        execvp(newargv[0], newargv); 
-        // kinda works? when prompt is passed "/bin/ls -al" returns error (execv: Bad address), tho still prints ls of directory
-        
-        // Now use execv to run "hello_world"
-        //execv("hello_world", newargv);
-        /* execve() returns only on error */
+        execvp(curr_command->argv[0],  curr_command->argv); 
 
-        // perror("execv");
-        perror(newargv[0]);
+        /* execve() returns only on error */
+        perror(curr_command->argv[0]);
         exit(EXIT_FAILURE);
-        // // The first child process will execute this branch
-        // printf("First child's pid = %d\n", getpid());
-        // sleep(10);
       } else {
         // this is to wait for the fork first child to finish/ return, passing the firstChild PID value
-        // printf("Child's pid = %d\n", firstChild);
-        firstChild = waitpid(firstChild, &childStatus, 0);
-        // set status from finished command
-        exit_stat =  WEXITSTATUS(childStatus);
 
-        // printf("waitpid returned value %d\n", firstChild);
-        // if(WIFEXITED(childStatus)){
-        //   printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
-        // } else{
-        //   printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
-        // }
-        //
+        // if foreground process (NOT background), wait for complete
+        if (!curr_command->is_bg) {
+          // printf("Child's pid = %d\n", firstChild);
+
+          firstChild = waitpid(firstChild, &childStatus, 0);
+
+          // set status from finished FOREGROUND command
+          exit_stat =  WEXITSTATUS(childStatus);
+
+          // printf("waitpid returned value %d\n", firstChild);
+          // if(WIFEXITED(childStatus)){
+          //   printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
+          // } else{
+          //   printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
+          // }
+          //
+        }
+        // else if background process, proceed. 
+        else if (curr_command->is_bg) {
+          printf("background pid is %d \n", firstChild);
+        }
       }
     }
 	}
