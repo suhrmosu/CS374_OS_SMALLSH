@@ -209,12 +209,15 @@ struct command_line *parse_input()
 	while(token){
 		if ( !strcmp(token,"<") ) {
       curr_command->re_in = true;
-			curr_command->input_file = strdup(strtok(NULL," \n"));
+			curr_command->input_file = strdup(strtok(NULL," \n")); // memory leak on badfile
 		} else if (!strcmp(token,">")) {
       curr_command->re_ot = true;
 			curr_command->output_file = strdup(strtok(NULL," \n"));
 		} else if (!strcmp(token,"&")) {
-			curr_command->is_bg = true;
+      if (!fg_only) {
+        curr_command->is_bg = true;
+      }
+			// curr_command->is_bg = true;
 		} else if (!strcmp(token,"exit")) {
 			curr_command->exit = true;
 		} else if (!strcmp(token,"status")) {
@@ -305,15 +308,17 @@ int main()
     // sigfillset(&SIGTSTP_action.sa_mask);
     // No flags set
     SIGTSTP_action.sa_flags = 0;
-    sigaction(SIGINT, &SIGTSTP_action, &ignore_action);
+    sigaction(SIGTSTP, &SIGTSTP_action, NULL); // null ?
 
     if (cntrl_z) {
       if (!fg_only) {
         fg_only = true;
-        printf("Entering foreground-only mode (& is now ignored) \n");
+        cntrl_z = false;
+        printf("\nEntering foreground-only mode (& is now ignored) \n");
       } else {
         fg_only = false;
-        printf("Exiting foreground-only mode \n");
+        cntrl_z = false;
+        printf("\nExiting foreground-only mode \n");
       }
     }
 
@@ -344,6 +349,8 @@ int main()
         setenv("PWD", getenv("HOME"), 1);
       }
       chdir(getenv("PWD")); 
+    } else if (cntrl_z) {
+      // skip fork
     } else {
       // Executing Other Commands:
       // utilizing 3 built-in command by using fork(), exec() and waitpid()
@@ -381,7 +388,7 @@ int main()
           // set input file from struct
           int sourceFD = open(curr_command->input_file, O_RDONLY);
           if (sourceFD == -1) { 
-            perror("source open()"); 
+            perror("source open()");  // "cannot open %s for input", curr_command->input_file
             exit(1); 
           }
           fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
@@ -494,8 +501,11 @@ int main()
           // waitChild = firstChild;
           addBgProcess(&wait_bg_forks, firstChild);
         }
+      // free(curr_command->argv);
+      free(curr_command);
       }
     }
 	}
+  free(wait_bg_forks.array);
 	return EXIT_SUCCESS;
 }
