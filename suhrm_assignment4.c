@@ -54,8 +54,48 @@ struct command_line
   bool re_ot;
 };
 
+typedef struct bg_forks 
+{
+  pid_t *array;
+  size_t count;
+  size_t size;
+} Array;
+
 struct command_line *parse_input();
 
+/*
+  init function for pid children in background
+  Adapted from provided content
+*/
+void init_bg_forks(struct bg_forks *wait_bg_forks) {
+  wait_bg_forks->array = malloc(5 * sizeof(pid_t));
+  wait_bg_forks->count = 0;
+  wait_bg_forks->size = 5;
+}
+
+/*
+  add background PID function for pid children in background
+  Adapted from provided content
+*/
+void addBgProcess(struct bg_forks *wait_bg_forks, pid_t BG) {
+  if (wait_bg_forks->count == wait_bg_forks->size ) {
+    wait_bg_forks->size *= 2;
+    wait_bg_forks->array = realloc(wait_bg_forks->array, wait_bg_forks->size * sizeof(pid_t));
+  }
+  wait_bg_forks->array[wait_bg_forks->count++] = BG;
+}
+
+/*
+  end background PID function for pid children in background
+  Adapted from provided content
+*/
+void endBgProcess(struct bg_forks *wait_bg_forks, int index) {
+  for (int i = index; i < (wait_bg_forks->count - 1); i++) {
+    wait_bg_forks->array[i] = wait_bg_forks->array[i+1];
+  }
+  wait_bg_forks->array[wait_bg_forks->count] = 0;
+  wait_bg_forks->count -= 1;
+}
   
 /*
   Adapted from provided content
@@ -148,19 +188,35 @@ int main()
   int exit_stat = 0;
   // int arrBg[25];
   // int i;
+
+  Array wait_bg_forks;
   pid_t waitChild = 44444; // need to make this a dynamic array ... 
+
+  init_bg_forks(&wait_bg_forks);
 
 	while(active_sh)
 	{
-    pid_t childPid = waitpid(waitChild, &childStatus, WNOHANG);
-    // status -1 for error/ no child
-    // status 0 for child still running
-    // status = PID for child completed process
-    if (childPid == waitChild) {
-      // need to update this to conditionally format the output... catch "termination by signal on pid"
-      printf("background pid %d is done: exit value %d \n", waitChild, WEXITSTATUS(childStatus));
+    // for all pending background processes
+    for (int i = 0; i < (wait_bg_forks.count); i++) {
+      // wait_bg_forks->array[i] = wait_bg_forks->array[i+1];
+      pid_t waitPid = wait_bg_forks.array[i];
+      pid_t childPid = waitpid(waitPid, &childStatus, WNOHANG);
+      if (childPid == waitPid) {
+        // need to update this to conditionally format the output... catch "termination by signal on pid"
+        printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
+        endBgProcess(&wait_bg_forks, i);
+      }
     }
-    printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
+
+    // pid_t childPid = waitpid(waitChild, &childStatus, WNOHANG);
+    // // status -1 for error/ no child
+    // // status 0 for child still running
+    // // status = PID for child completed process
+    // if (childPid == waitChild) {
+    //   // need to update this to conditionally format the output... catch "termination by signal on pid"
+    //   printf("background pid %d is done: exit value %d \n", waitChild, WEXITSTATUS(childStatus));
+    // }
+    // printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
 
 		curr_command = parse_input();
     // need to parse what the input is here
@@ -310,6 +366,7 @@ int main()
           // pid_t childPid = waitpid(firstChild, &childStatus, 0);
           // printf("background pid %d is done: terminated by signal %d \n", childPid, WEXITSTATUS(childStatus));
           waitChild = firstChild;
+          addBgProcess(&wait_bg_forks, firstChild);
         }
       }
     }
