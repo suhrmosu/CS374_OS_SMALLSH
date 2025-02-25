@@ -86,7 +86,12 @@ struct command_line *parse_input();
 void handle_SIGINT(int signo){
   // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
   // printf("background pid <> is done: signal number %d \n", signo);
-  printf("\nterminated by signal %d \n", signo);
+  
+  // must use write() reentrant 
+  char* message = "\nterminated by signal 2 \n";
+  write(STDOUT_FILENO, message, 25);
+  // printf("\nterminated by signal %d \n", signo);
+
   cntrl_c = true;
   // killpg(firstChild, SIGINT);
   // raise(SIGCHLD);
@@ -125,6 +130,8 @@ void handle_SIGTSTP(int signo){
   // // Sleep for 10 seconds
   // sleep(10);
 }
+
+// need signal handler for SIGTERM ~ record and print terminating signal
 
 /*
   init function for pid children in background
