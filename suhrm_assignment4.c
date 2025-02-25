@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <signal.h>
 
 /*
     Program Name: Assignment 4: SMALLSH
@@ -28,11 +29,14 @@
     // URL: https://canvas.oregonstate.edu/courses/1987883/assignments/9864854?module_item_id=24956222
     // URL: https://canvas.oregonstate.edu/courses/1987883/pages/exploration-process-api-monitoring-child-processes?module_item_id=24956219
     // URL: https://canvas.oregonstate.edu/courses/1987883/pages/exploration-process-api-creating-and-terminating-processes?module_item_id=24956218
+    // URL: https://canvas.oregonstate.edu/courses/1987883/pages/exploration-signal-handling-api?module_item_id=24956227
     // provided code sourced, reviewed, and adapted for code functionality
 */
 
 #define INPUT_LENGTH 2048
 #define MAX_ARGS		 512
+
+bool cntrl_c = false;
 
 /*
   struct object to compile command line character inputs 
@@ -54,6 +58,11 @@ struct command_line
   bool re_ot;
 };
 
+/*
+  struct object to compile background fork child processes PID 
+  Adapted from provided content
+  // use and adaption from personal suhrm_assignment2.c, suhrm_assignment3.c, CS374 course instructional material and code
+*/
 typedef struct bg_forks 
 {
   pid_t *array;
@@ -62,6 +71,32 @@ typedef struct bg_forks
 } Array;
 
 struct command_line *parse_input();
+
+/*
+  Adapted from provided content
+  Function handle_SIGINT
+  Handler for SIGINT Control-C
+  Arguments: 
+      int signo = signal number
+  Returns: none
+  // use and adaption from CS374 course instructional material and code
+*/
+void handle_SIGINT(int signo){
+  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+  // printf("background pid <> is done: signal number %d \n", signo);
+  printf("\nterminated by signal %d \n", signo);
+  cntrl_c = true;
+  // killpg(firstChild, SIGINT);
+  // raise(SIGCHLD);
+  // exit(signo);
+  // char* message = "Caught SIGINT, sleeping for 10 seconds\n";
+  // write(STDOUT_FILENO, message, 39);
+  // // Raise SIGUSR2. However, since this signal is blocked until handle_SIGNIT
+  // // finishes, it will be delivered only when handle_SIGINT finishes
+  // raise(SIGUSR2);
+  // // Sleep for 10 seconds
+  // sleep(10);
+}
 
 /*
   init function for pid children in background
@@ -116,6 +151,8 @@ struct command_line *parse_input()
 {
 	char input[INPUT_LENGTH];
 	struct command_line *curr_command = (struct command_line *) calloc(1, sizeof(struct command_line));
+  // struct sigaction ignore_action = {0};
+  // sigaction(SIGINT, &ignore_action, NULL);
 
 	// Get input
 	printf(": ");
@@ -137,6 +174,7 @@ struct command_line *parse_input()
   //   // curr_command->new_ln = true;
   //   // return curr_command;
   // }
+  curr_command->is_bg = false;
 
 	// Tokenize the input
 	char *token = strtok(input, " \n");
@@ -186,11 +224,21 @@ int main()
   char* newLine = "\n";
   bool active_sh = true;
   int exit_stat = 0;
-  // int arrBg[25];
-  // int i;
-
   Array wait_bg_forks;
-  pid_t waitChild = 44444; // need to make this a dynamic array ... 
+  // Signal hand
+  struct sigaction SIGINT_action = {0};
+  struct sigaction ignore_action = {0};
+
+  // SIGINT_action.sa_handler = handle_SIGINT;
+  // // Block all catchable signals while handle_SIGINT is running
+  // sigfillset(&SIGINT_action.sa_mask);
+  // // No flags set
+  // SIGINT_action.sa_flags = 0;
+  // sigaction(SIGINT, &SIGINT_action, NULL);
+
+  ignore_action.sa_handler = SIG_IGN;
+  sigaction(SIGTERM, &ignore_action, NULL);
+  sigaction(SIGINT, &ignore_action, NULL);
 
   init_bg_forks(&wait_bg_forks);
 
@@ -218,6 +266,8 @@ int main()
     // }
     // printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
 
+    sigaction(SIGINT, &ignore_action, NULL);
+
 		curr_command = parse_input();
     // need to parse what the input is here
       // if (blank line) (# comment with pound) { skip to next re-prompt : } // PASS
@@ -231,7 +281,12 @@ int main()
       active_sh = false;
     } else if ( (curr_command->stat) ) { 
       // display status last command (or 0 if none yet)
-      printf("exit value %d \n", exit_stat);
+      if (!cntrl_c) {
+        printf("exit value %d \n", exit_stat);
+      } else {
+        printf("terminated by signal 2 \n");
+      }
+      // printf("exit value %d \n", exit_stat);
     } else if ( (curr_command->change_wd) ) { 
       // change working directory, set as PWD
       if (curr_command->argv[0]) {
@@ -243,7 +298,7 @@ int main()
     } else {
       // Executing Other Commands:
       // utilizing 3 built-in command by using fork(), exec() and waitpid()
-
+      
       // fork off child process to call exec()
       pid_t firstChild = fork();
 
@@ -252,6 +307,24 @@ int main()
         exit(EXIT_FAILURE);
       } else if (firstChild == 0) {
         // This is the child fork process
+
+        // if background, ignore SIGINT
+        if (curr_command->is_bg) {
+          sigaction(SIGINT, &ignore_action, NULL);
+        } else 
+        // if foreground, set handler SIGINT
+        // if (!curr_command->is_bg) 
+        {
+          // cntrl_c = false;
+          // sigaction(SIGINT, &SIGINT_action, NULL);
+          SIGINT_action.sa_handler = handle_SIGINT;
+          // // Block all catchable signals while handle_SIGINT is running
+          // sigfillset(&SIGINT_action.sa_mask);
+          // No flags set
+          SIGINT_action.sa_flags = SIGCHLD;
+          sigaction(SIGINT, &SIGINT_action, &ignore_action);
+          // cntrl_c = false;
+        }
 
         // redirect I/O
         if (curr_command->re_in) {
@@ -323,16 +396,6 @@ int main()
             exit(2); 
           }
         }
-        // if (curr_command->is_bg) {
-        //   // store pid of background children 
-        //   // store(getpid());
-          
-        //   // int bg_child = getpid();
-        //   waitChild = getpid();
-        //   // int length = sizeof(arrBg) / sizeof(arrBg[0]);
-        //   // printf(" child pid %d length arrBg %d", bg_child, length);
-        //   // arrBg[length] = bg_child;
-        // }
 
         // utilizing the p argument will search path for file input as first argument
         execvp(curr_command->argv[0],  curr_command->argv); 
@@ -342,30 +405,43 @@ int main()
         exit(EXIT_FAILURE);
       } else {
         // this is to wait for the fork first child to finish/ return, passing the firstChild PID value
+        
+        // sigaction(SIGINT, &ignore_action, NULL);
 
         // if foreground process (NOT background), wait for complete
         if (!curr_command->is_bg) {
-          // printf("Child's pid = %d\n", firstChild);
+          // handle SIGINT for FOREGROUND PROCESS
+          SIGINT_action.sa_handler = handle_SIGINT;
+          // // Block all catchable signals while handle_SIGINT is running
+          // sigfillset(&SIGINT_action.sa_mask);
+          // No flags set
+          SIGINT_action.sa_flags = SIGCHLD;
+          sigaction(SIGINT, &SIGINT_action, &ignore_action);
 
+          // printf("Child's pid = %d\n", firstChild);
+          cntrl_c = false;
           firstChild = waitpid(firstChild, &childStatus, 0);
+          // printf("foreground process exit stat %d \n", WIFEXITED(childStatus));
 
           // set status from finished FOREGROUND command
           exit_stat =  WEXITSTATUS(childStatus);
 
           // printf("waitpid returned value %d\n", firstChild);
           // if(WIFEXITED(childStatus)){
+          //   exit_stat =  WEXITSTATUS(childStatus);
           //   printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
           // } else{
+          //   exit_stat =  WTERMSIG(childStatus);
           //   printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
           // }
-          //
+          
         }
         // else if background process, proceed. 
         else if (curr_command->is_bg) {
           printf("background pid is %d \n", firstChild);
           // pid_t childPid = waitpid(firstChild, &childStatus, 0);
           // printf("background pid %d is done: terminated by signal %d \n", childPid, WEXITSTATUS(childStatus));
-          waitChild = firstChild;
+          // waitChild = firstChild;
           addBgProcess(&wait_bg_forks, firstChild);
         }
       }
