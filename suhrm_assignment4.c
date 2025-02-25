@@ -37,6 +37,8 @@
 #define MAX_ARGS		 512
 
 bool cntrl_c = false;
+bool cntrl_z = false;
+bool fg_only = false;
 
 /*
   struct object to compile command line character inputs 
@@ -86,6 +88,32 @@ void handle_SIGINT(int signo){
   // printf("background pid <> is done: signal number %d \n", signo);
   printf("\nterminated by signal %d \n", signo);
   cntrl_c = true;
+  // killpg(firstChild, SIGINT);
+  // raise(SIGCHLD);
+  // exit(signo);
+  // char* message = "Caught SIGINT, sleeping for 10 seconds\n";
+  // write(STDOUT_FILENO, message, 39);
+  // // Raise SIGUSR2. However, since this signal is blocked until handle_SIGNIT
+  // // finishes, it will be delivered only when handle_SIGINT finishes
+  // raise(SIGUSR2);
+  // // Sleep for 10 seconds
+  // sleep(10);
+}
+
+/*
+  Adapted from provided content
+  Function handle_SIGTSTP
+  Handler for handle_SIGTSTP Control-Z
+  Arguments: 
+      int signo = signal number
+  Returns: none
+  // use and adaption from CS374 course instructional material and code
+*/
+void handle_SIGTSTP(int signo){
+  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+  // printf("background pid <> is done: signal number %d \n", signo);
+  // printf("\nterminated by signal %d \n", signo);
+  cntrl_z = true;
   // killpg(firstChild, SIGINT);
   // raise(SIGCHLD);
   // exit(signo);
@@ -227,6 +255,7 @@ int main()
   Array wait_bg_forks;
   // Signal hand
   struct sigaction SIGINT_action = {0};
+  struct sigaction SIGTSTP_action = {0};
   struct sigaction ignore_action = {0};
 
   // SIGINT_action.sa_handler = handle_SIGINT;
@@ -237,8 +266,9 @@ int main()
   // sigaction(SIGINT, &SIGINT_action, NULL);
 
   ignore_action.sa_handler = SIG_IGN;
-  sigaction(SIGTERM, &ignore_action, NULL);
+  // sigaction(SIGTERM, &ignore_action, NULL);
   sigaction(SIGINT, &ignore_action, NULL);
+  sigaction(SIGTSTP, &ignore_action, NULL);
 
   init_bg_forks(&wait_bg_forks);
 
@@ -267,6 +297,25 @@ int main()
     // printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
 
     sigaction(SIGINT, &ignore_action, NULL);
+    // sigaction(SIGTSTP, &ignore_action, NULL);
+
+    // handle SIGTSTP for PARENT PROCESS
+    SIGTSTP_action.sa_handler = handle_SIGTSTP;
+    // // Block all catchable signals while handle_SIGTSTP is running
+    // sigfillset(&SIGTSTP_action.sa_mask);
+    // No flags set
+    SIGTSTP_action.sa_flags = 0;
+    sigaction(SIGINT, &SIGTSTP_action, &ignore_action);
+
+    if (cntrl_z) {
+      if (!fg_only) {
+        fg_only = true;
+        printf("Entering foreground-only mode (& is now ignored) \n");
+      } else {
+        fg_only = false;
+        printf("Exiting foreground-only mode \n");
+      }
+    }
 
 		curr_command = parse_input();
     // need to parse what the input is here
@@ -307,6 +356,7 @@ int main()
         exit(EXIT_FAILURE);
       } else if (firstChild == 0) {
         // This is the child fork process
+        sigaction(SIGTSTP, &ignore_action, NULL);
 
         // if background, ignore SIGINT
         if (curr_command->is_bg) {
