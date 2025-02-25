@@ -146,9 +146,22 @@ int main()
   char* newLine = "\n";
   bool active_sh = true;
   int exit_stat = 0;
+  // int arrBg[25];
+  // int i;
+  pid_t waitChild = 44444; // need to make this a dynamic array ... 
 
 	while(active_sh)
 	{
+    pid_t childPid = waitpid(waitChild, &childStatus, WNOHANG);
+    // status -1 for error/ no child
+    // status 0 for child still running
+    // status = PID for child completed process
+    if (childPid == waitChild) {
+      // need to update this to conditionally format the output... catch "termination by signal on pid"
+      printf("background pid %d is done: exit value %d \n", waitChild, WEXITSTATUS(childStatus));
+    }
+    printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
+
 		curr_command = parse_input();
     // need to parse what the input is here
       // if (blank line) (# comment with pound) { skip to next re-prompt : } // PASS
@@ -181,7 +194,7 @@ int main()
       if (firstChild == -1) {
         perror("fork() failed!");
         exit(EXIT_FAILURE);
-      } else if(firstChild == 0) {
+      } else if (firstChild == 0) {
         // This is the child fork process
 
         // redirect I/O
@@ -195,7 +208,7 @@ int main()
           fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
 
           // Write the file descriptor to stdout
-          printf("File descriptor of input file = %d\n", sourceFD); 
+          // printf("File descriptor of input file = %d\n", sourceFD); 
 
           // Redirect stdin to source file
           int result = dup2(sourceFD, 0);
@@ -205,6 +218,20 @@ int main()
           }
         }
         // if not re_in && is_bg --> { standard input must be redirected to /dev/null. }
+        else if ((!curr_command->re_in) && (curr_command->is_bg)) {
+          int sourceFD = open("/dev/null", O_RDONLY);
+          if (sourceFD == -1) { 
+            perror("source open()"); 
+            exit(1); 
+          }
+          fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
+          // Redirect stdin to /dev/null
+          int result = dup2(sourceFD, 0);
+          if (result == -1) { 
+            perror("input /dev/null dup2()"); 
+            exit(2); 
+          }
+        }
         if (curr_command->re_ot) {
           // set output file from struct
           int targetFD = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -216,7 +243,7 @@ int main()
           fcntl(targetFD, F_SETFD, FD_CLOEXEC);
 
           // Write the file descriptor to stdout
-          printf("File descriptor of output file = %d\n", targetFD);
+          // printf("File descriptor of output file = %d\n", targetFD);
           
           // Redirect stdout to target file
           int result = dup2(targetFD, 1);
@@ -226,6 +253,30 @@ int main()
           }
         }
         // if not re_ot && is_bg --> { standard output must be redirected to /dev/null. }
+        else if ((!curr_command->re_ot) && (curr_command->is_bg)) {
+          int targetFD = open("/dev/null", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+          if (targetFD == -1) { 
+            perror("target open()"); 
+            exit(1); 
+          }
+          fcntl(targetFD, F_SETFD, FD_CLOEXEC);
+          // Redirect stdout to target file
+          int result = dup2(targetFD, 1);
+          if (result == -1) { 
+            perror("target dup2()"); 
+            exit(2); 
+          }
+        }
+        // if (curr_command->is_bg) {
+        //   // store pid of background children 
+        //   // store(getpid());
+          
+        //   // int bg_child = getpid();
+        //   waitChild = getpid();
+        //   // int length = sizeof(arrBg) / sizeof(arrBg[0]);
+        //   // printf(" child pid %d length arrBg %d", bg_child, length);
+        //   // arrBg[length] = bg_child;
+        // }
 
         // utilizing the p argument will search path for file input as first argument
         execvp(curr_command->argv[0],  curr_command->argv); 
@@ -256,6 +307,9 @@ int main()
         // else if background process, proceed. 
         else if (curr_command->is_bg) {
           printf("background pid is %d \n", firstChild);
+          // pid_t childPid = waitpid(firstChild, &childStatus, 0);
+          // printf("background pid %d is done: terminated by signal %d \n", childPid, WEXITSTATUS(childStatus));
+          waitChild = firstChild;
         }
       }
     }
