@@ -39,6 +39,9 @@
 bool cntrl_c = false;
 bool cntrl_z = false;
 bool fg_only = false;
+// bool sig_term = false;
+pid_t term_pid;
+int signum;
 
 /*
   struct object to compile command line character inputs 
@@ -71,6 +74,14 @@ typedef struct bg_forks
   size_t count;
   size_t size;
 } Array;
+
+// struct sigaction {
+//   void     (*sa_handler)(int);
+//   void     (*sa_sigaction)(int, siginfo_t *, void *);
+//   sigset_t   sa_mask;
+//   int        sa_flags;
+//   void     (*sa_restorer)(void);
+// };
 
 struct command_line *parse_input();
 
@@ -132,6 +143,61 @@ void handle_SIGTSTP(int signo){
 }
 
 // need signal handler for SIGTERM ~ record and print terminating signal
+
+/*
+  Adapted from provided content
+  Function handle_SIGTERM
+  Handler for handle_SIGTERM kill process
+  Arguments: 
+      int signo = signal number
+  Returns: none
+  // use and adaption from CS374 course instructional material and code
+*/
+void handle_SIGTERM(int signo){ 
+  // siginfo_t *info // , struct sigaction *info
+
+  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+  // printf("background pid <> is done: signal number %d \n", signo);
+  // printf("\nterminated by signal %d \n", signo);
+  // cntrl_z = true;
+
+  // signum = signo;
+
+  // sig_term = true;
+  // term_pid = info->sa_sigaction->siginfo_t->si_pid;
+
+  // printf("sigterm number %d , info.. ", signo);
+  char* message = "\nterminated by signal 15 \n";
+  write(STDOUT_FILENO, message, 26);
+}
+
+/*
+  Adapted from provided content
+  Function handle_SIGKILL
+  Handler for handle_SIGKILL kill process
+  Arguments: 
+      int signo = signal number
+  Returns: none
+  // use and adaption from CS374 course instructional material and code
+*/
+void handle_SIGKILL(int signo){ 
+  // siginfo_t *info // , struct sigaction *info
+
+  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+  // printf("background pid <> is done: signal number %d \n", signo);
+  // printf("\nterminated by signal %d \n", signo);
+  // cntrl_z = true;
+
+  // signum = signo;
+
+  // sig_term = true;
+  // term_pid = info->sa_sigaction->siginfo_t->si_pid;
+
+  char* message = "\nterminated by signal 9 \n";
+  write(STDOUT_FILENO, message, 25);
+  
+  // printf("sigterm number %d , info.. ", signo);
+}
 
 /*
   init function for pid children in background
@@ -266,6 +332,8 @@ int main()
   // Signal hand
   struct sigaction SIGINT_action = {0};
   struct sigaction SIGTSTP_action = {0};
+  struct sigaction SIGTERM_action = {0};
+  struct sigaction SIGKILL_action = {0};
   struct sigaction ignore_action = {0};
 
   // SIGINT_action.sa_handler = handle_SIGINT;
@@ -280,6 +348,30 @@ int main()
   sigaction(SIGINT, &ignore_action, NULL);
   sigaction(SIGTSTP, &ignore_action, NULL);
 
+
+  // handle SIGTERM for PARENT PROCESS
+  // SIGTERM_action.sa_flags = SA_SIGINFO;
+
+  // SIGTERM_action.sa_handler = handle_SIGTERM;
+  // // // Block all catchable signals while handle_SIGTSTP is running
+  // sigfillset(&SIGTERM_action.sa_mask);
+  // // No flags set
+  // SIGTERM_action.sa_flags = 0;
+  // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
+
+  sigaction(SIGTERM, &ignore_action, NULL);
+  sigaction(SIGKILL, &ignore_action, NULL);
+
+  // handle handle_SIGKILL for PARENT PROCESS
+  // SIGKILL_action.sa_flags = SA_SIGINFO;
+  
+  // SIGKILL_action.sa_handler = handle_SIGKILL;
+  // // // Block all catchable signals while handle_SIGTSTP is running
+  // sigfillset(&SIGKILL_action.sa_mask);
+  // // No flags set
+  // SIGKILL_action.sa_flags = 0;
+  // sigaction(SIGKILL, &SIGKILL_action, NULL); // null ?
+
   init_bg_forks(&wait_bg_forks);
 
 	while(active_sh)
@@ -290,8 +382,21 @@ int main()
       pid_t waitPid = wait_bg_forks.array[i];
       pid_t childPid = waitpid(waitPid, &childStatus, WNOHANG);
       if (childPid == waitPid) {
+        // printf("this is the WIFEXITED exit stat %d \n",  WIFEXITED(childStatus));
+        // printf("this is the WEXITSTATUS exit stat %d \n",  WEXITSTATUS(childStatus));
+        // printf("this is the WTERMSIG exit stat %d \n",  WTERMSIG(childStatus));
+        if (WIFEXITED(childStatus) == 0) {
+          printf("background pid %d is done: terminated by signal %d \n", waitPid, WTERMSIG(childStatus));
+          // term_pid = 0;
+          // signum = 0;
+          // endBgProcess(&wait_bg_forks, i);
+        } else {
+          //
+          printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
+          // endBgProcess(&wait_bg_forks, i);
+        }
         // need to update this to conditionally format the output... catch "termination by signal on pid"
-        printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
+        // printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
         endBgProcess(&wait_bg_forks, i);
       }
     }
@@ -316,6 +421,14 @@ int main()
     // No flags set
     SIGTSTP_action.sa_flags = 0;
     sigaction(SIGTSTP, &SIGTSTP_action, NULL); // null ?
+
+    // set sigterm  for background process
+    SIGTERM_action.sa_handler = handle_SIGTERM;
+    // // Block all catchable signals while handle_SIGTSTP is running
+    sigfillset(&SIGTERM_action.sa_mask);
+    // No flags set
+    SIGTERM_action.sa_flags = 0;
+    sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
 
     if (cntrl_z) {
       if (!fg_only) {
@@ -375,6 +488,15 @@ int main()
         // if background, ignore SIGINT
         if (curr_command->is_bg) {
           sigaction(SIGINT, &ignore_action, NULL);
+
+          // // set sigterm  for background process
+          // SIGTERM_action.sa_handler = handle_SIGTERM;
+          // // // Block all catchable signals while handle_SIGTSTP is running
+          // sigfillset(&SIGTERM_action.sa_mask);
+          // // No flags set
+          // SIGTERM_action.sa_flags = 0;
+          // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
+
         } else 
         // if foreground, set handler SIGINT
         // if (!curr_command->is_bg) 
