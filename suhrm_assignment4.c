@@ -39,9 +39,7 @@
 bool cntrl_c = false;
 bool cntrl_z = false;
 bool fg_only = false;
-// bool sig_term = false;
-pid_t term_pid;
-int signum;
+
 
 /*
   struct object to compile command line character inputs 
@@ -75,13 +73,6 @@ typedef struct bg_forks
   size_t size;
 } Array;
 
-// struct sigaction {
-//   void     (*sa_handler)(int);
-//   void     (*sa_sigaction)(int, siginfo_t *, void *);
-//   sigset_t   sa_mask;
-//   int        sa_flags;
-//   void     (*sa_restorer)(void);
-// };
 
 struct command_line *parse_input();
 
@@ -95,25 +86,11 @@ struct command_line *parse_input();
   // use and adaption from CS374 course instructional material and code
 */
 void handle_SIGINT(int signo){
-  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-  // printf("background pid <> is done: signal number %d \n", signo);
-  
   // must use write() reentrant 
   char* message = "\nterminated by signal 2 \n";
   write(STDOUT_FILENO, message, 25);
-  // printf("\nterminated by signal %d \n", signo);
 
   cntrl_c = true;
-  // killpg(firstChild, SIGINT);
-  // raise(SIGCHLD);
-  // exit(signo);
-  // char* message = "Caught SIGINT, sleeping for 10 seconds\n";
-  // write(STDOUT_FILENO, message, 39);
-  // // Raise SIGUSR2. However, since this signal is blocked until handle_SIGNIT
-  // // finishes, it will be delivered only when handle_SIGINT finishes
-  // raise(SIGUSR2);
-  // // Sleep for 10 seconds
-  // sleep(10);
 }
 
 /*
@@ -126,23 +103,9 @@ void handle_SIGINT(int signo){
   // use and adaption from CS374 course instructional material and code
 */
 void handle_SIGTSTP(int signo){
-  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-  // printf("background pid <> is done: signal number %d \n", signo);
-  // printf("\nterminated by signal %d \n", signo);
   cntrl_z = true;
-  // killpg(firstChild, SIGINT);
-  // raise(SIGCHLD);
-  // exit(signo);
-  // char* message = "Caught SIGINT, sleeping for 10 seconds\n";
-  // write(STDOUT_FILENO, message, 39);
-  // // Raise SIGUSR2. However, since this signal is blocked until handle_SIGNIT
-  // // finishes, it will be delivered only when handle_SIGINT finishes
-  // raise(SIGUSR2);
-  // // Sleep for 10 seconds
-  // sleep(10);
 }
 
-// need signal handler for SIGTERM ~ record and print terminating signal
 
 /*
   Adapted from provided content
@@ -153,23 +116,23 @@ void handle_SIGTSTP(int signo){
   Returns: none
   // use and adaption from CS374 course instructional material and code
 */
-void handle_SIGTERM(int signo){ 
-  // siginfo_t *info // , struct sigaction *info
+// void handle_SIGTERM(int signo){ 
+//   // siginfo_t *info // , struct sigaction *info
 
-  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-  // printf("background pid <> is done: signal number %d \n", signo);
-  // printf("\nterminated by signal %d \n", signo);
-  // cntrl_z = true;
+//   // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+//   // printf("background pid <> is done: signal number %d \n", signo);
+//   // printf("\nterminated by signal %d \n", signo);
+//   // cntrl_z = true;
 
-  // signum = signo;
+//   // signum = signo;
 
-  // sig_term = true;
-  // term_pid = info->sa_sigaction->siginfo_t->si_pid;
+//   // sig_term = true;
+//   // term_pid = info->sa_sigaction->siginfo_t->si_pid;
 
-  // printf("sigterm number %d , info.. ", signo);
-  char* message = "\nterminated by signal 15 \n";
-  write(STDOUT_FILENO, message, 26);
-}
+//   // printf("sigterm number %d , info.. ", signo);
+//   char* message = "\nterminated by signal 15 \n";
+//   write(STDOUT_FILENO, message, 26);
+// }
 
 /*
   Adapted from provided content
@@ -180,24 +143,24 @@ void handle_SIGTERM(int signo){
   Returns: none
   // use and adaption from CS374 course instructional material and code
 */
-void handle_SIGKILL(int signo){ 
-  // siginfo_t *info // , struct sigaction *info
+// void handle_SIGKILL(int signo){ 
+//   // siginfo_t *info // , struct sigaction *info
 
-  // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-  // printf("background pid <> is done: signal number %d \n", signo);
-  // printf("\nterminated by signal %d \n", signo);
-  // cntrl_z = true;
+//   // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
+//   // printf("background pid <> is done: signal number %d \n", signo);
+//   // printf("\nterminated by signal %d \n", signo);
+//   // cntrl_z = true;
 
-  // signum = signo;
+//   // signum = signo;
 
-  // sig_term = true;
-  // term_pid = info->sa_sigaction->siginfo_t->si_pid;
+//   // sig_term = true;
+//   // term_pid = info->sa_sigaction->siginfo_t->si_pid;
 
-  char* message = "\nterminated by signal 9 \n";
-  write(STDOUT_FILENO, message, 25);
+//   char* message = "\nterminated by signal 9 \n";
+//   write(STDOUT_FILENO, message, 25);
   
-  // printf("sigterm number %d , info.. ", signo);
-}
+//   // printf("sigterm number %d , info.. ", signo);
+// }
 
 /*
   init function for pid children in background
@@ -252,8 +215,6 @@ struct command_line *parse_input()
 {
 	char input[INPUT_LENGTH];
 	struct command_line *curr_command = (struct command_line *) calloc(1, sizeof(struct command_line));
-  // struct sigaction ignore_action = {0};
-  // sigaction(SIGINT, &ignore_action, NULL);
 
 	// Get input
 	printf(": ");
@@ -269,12 +230,7 @@ struct command_line *parse_input()
     curr_command->new_ln = true;
     return curr_command;
   } 
-  // else if (!strncmp(&input[0] , "cd",2)) {
-  //   // printf("change p");
-  //   curr_command->change_wd = true;
-  //   // curr_command->new_ln = true;
-  //   // return curr_command;
-  // }
+
   curr_command->is_bg = false;
 
 	// Tokenize the input
@@ -332,45 +288,17 @@ int main()
   // Signal hand
   struct sigaction SIGINT_action = {0};
   struct sigaction SIGTSTP_action = {0};
-  struct sigaction SIGTERM_action = {0};
-  struct sigaction SIGKILL_action = {0};
+  // struct sigaction SIGTERM_action = {0};
+  // struct sigaction SIGKILL_action = {0};
   struct sigaction ignore_action = {0};
-
-  // SIGINT_action.sa_handler = handle_SIGINT;
-  // // Block all catchable signals while handle_SIGINT is running
-  // sigfillset(&SIGINT_action.sa_mask);
-  // // No flags set
-  // SIGINT_action.sa_flags = 0;
-  // sigaction(SIGINT, &SIGINT_action, NULL);
 
   ignore_action.sa_handler = SIG_IGN;
   // sigaction(SIGTERM, &ignore_action, NULL);
   sigaction(SIGINT, &ignore_action, NULL);
   sigaction(SIGTSTP, &ignore_action, NULL);
 
-
-  // handle SIGTERM for PARENT PROCESS
-  // SIGTERM_action.sa_flags = SA_SIGINFO;
-
-  // SIGTERM_action.sa_handler = handle_SIGTERM;
-  // // // Block all catchable signals while handle_SIGTSTP is running
-  // sigfillset(&SIGTERM_action.sa_mask);
-  // // No flags set
-  // SIGTERM_action.sa_flags = 0;
-  // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
-
-  sigaction(SIGTERM, &ignore_action, NULL);
-  sigaction(SIGKILL, &ignore_action, NULL);
-
-  // handle handle_SIGKILL for PARENT PROCESS
-  // SIGKILL_action.sa_flags = SA_SIGINFO;
-  
-  // SIGKILL_action.sa_handler = handle_SIGKILL;
-  // // // Block all catchable signals while handle_SIGTSTP is running
-  // sigfillset(&SIGKILL_action.sa_mask);
-  // // No flags set
-  // SIGKILL_action.sa_flags = 0;
-  // sigaction(SIGKILL, &SIGKILL_action, NULL); // null ?
+  // sigaction(SIGTERM, &ignore_action, NULL);
+  // sigaction(SIGKILL, &ignore_action, NULL);
 
   init_bg_forks(&wait_bg_forks);
 
@@ -382,34 +310,14 @@ int main()
       pid_t waitPid = wait_bg_forks.array[i];
       pid_t childPid = waitpid(waitPid, &childStatus, WNOHANG);
       if (childPid == waitPid) {
-        // printf("this is the WIFEXITED exit stat %d \n",  WIFEXITED(childStatus));
-        // printf("this is the WEXITSTATUS exit stat %d \n",  WEXITSTATUS(childStatus));
-        // printf("this is the WTERMSIG exit stat %d \n",  WTERMSIG(childStatus));
         if (WIFEXITED(childStatus) == 0) {
           printf("background pid %d is done: terminated by signal %d \n", waitPid, WTERMSIG(childStatus));
-          // term_pid = 0;
-          // signum = 0;
-          // endBgProcess(&wait_bg_forks, i);
         } else {
-          //
           printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
-          // endBgProcess(&wait_bg_forks, i);
         }
-        // need to update this to conditionally format the output... catch "termination by signal on pid"
-        // printf("background pid %d is done: exit value %d \n", waitPid, WEXITSTATUS(childStatus));
         endBgProcess(&wait_bg_forks, i);
       }
     }
-
-    // pid_t childPid = waitpid(waitChild, &childStatus, WNOHANG);
-    // // status -1 for error/ no child
-    // // status 0 for child still running
-    // // status = PID for child completed process
-    // if (childPid == waitChild) {
-    //   // need to update this to conditionally format the output... catch "termination by signal on pid"
-    //   printf("background pid %d is done: exit value %d \n", waitChild, WEXITSTATUS(childStatus));
-    // }
-    // printf("background pid %d is done: terminated by signal %d waitpid return %d \n", waitChild, WEXITSTATUS(childStatus), childPid);
 
     sigaction(SIGINT, &ignore_action, NULL);
     // sigaction(SIGTSTP, &ignore_action, NULL);
@@ -422,13 +330,13 @@ int main()
     SIGTSTP_action.sa_flags = 0;
     sigaction(SIGTSTP, &SIGTSTP_action, NULL); // null ?
 
-    // set sigterm  for background process
-    SIGTERM_action.sa_handler = handle_SIGTERM;
-    // // Block all catchable signals while handle_SIGTSTP is running
-    sigfillset(&SIGTERM_action.sa_mask);
-    // No flags set
-    SIGTERM_action.sa_flags = 0;
-    sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
+    // // set sigterm  for background process
+    // SIGTERM_action.sa_handler = handle_SIGTERM;
+    // // // Block all catchable signals while handle_SIGTSTP is running
+    // sigfillset(&SIGTERM_action.sa_mask);
+    // // No flags set
+    // SIGTERM_action.sa_flags = 0;
+    // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
 
     if (cntrl_z) {
       if (!fg_only) {
@@ -488,14 +396,6 @@ int main()
         // if background, ignore SIGINT
         if (curr_command->is_bg) {
           sigaction(SIGINT, &ignore_action, NULL);
-
-          // // set sigterm  for background process
-          // SIGTERM_action.sa_handler = handle_SIGTERM;
-          // // // Block all catchable signals while handle_SIGTSTP is running
-          // sigfillset(&SIGTERM_action.sa_mask);
-          // // No flags set
-          // SIGTERM_action.sa_flags = 0;
-          // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
 
         } else 
         // if foreground, set handler SIGINT
@@ -612,14 +512,6 @@ int main()
           // set status from finished FOREGROUND command
           exit_stat =  WEXITSTATUS(childStatus);
 
-          // printf("waitpid returned value %d\n", firstChild);
-          // if(WIFEXITED(childStatus)){
-          //   exit_stat =  WEXITSTATUS(childStatus);
-          //   printf("Child %d exited normally with status %d\n", firstChild, WEXITSTATUS(childStatus));
-          // } else{
-          //   exit_stat =  WTERMSIG(childStatus);
-          //   printf("Child %d exited abnormally due to signal %d\n", firstChild, WTERMSIG(childStatus));
-          // }
           
         }
         // else if background process, proceed. 
