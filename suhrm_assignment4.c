@@ -106,62 +106,6 @@ void handle_SIGTSTP(int signo){
   cntrl_z = true;
 }
 
-
-/*
-  Adapted from provided content
-  Function handle_SIGTERM
-  Handler for handle_SIGTERM kill process
-  Arguments: 
-      int signo = signal number
-  Returns: none
-  // use and adaption from CS374 course instructional material and code
-*/
-// void handle_SIGTERM(int signo){ 
-//   // siginfo_t *info // , struct sigaction *info
-
-//   // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-//   // printf("background pid <> is done: signal number %d \n", signo);
-//   // printf("\nterminated by signal %d \n", signo);
-//   // cntrl_z = true;
-
-//   // signum = signo;
-
-//   // sig_term = true;
-//   // term_pid = info->sa_sigaction->siginfo_t->si_pid;
-
-//   // printf("sigterm number %d , info.. ", signo);
-//   char* message = "\nterminated by signal 15 \n";
-//   write(STDOUT_FILENO, message, 26);
-// }
-
-/*
-  Adapted from provided content
-  Function handle_SIGKILL
-  Handler for handle_SIGKILL kill process
-  Arguments: 
-      int signo = signal number
-  Returns: none
-  // use and adaption from CS374 course instructional material and code
-*/
-// void handle_SIGKILL(int signo){ 
-//   // siginfo_t *info // , struct sigaction *info
-
-//   // printf("background pid %d is done: terminated by signal %d \n", waitChild, WEXITSTATUS(childStatus));
-//   // printf("background pid <> is done: signal number %d \n", signo);
-//   // printf("\nterminated by signal %d \n", signo);
-//   // cntrl_z = true;
-
-//   // signum = signo;
-
-//   // sig_term = true;
-//   // term_pid = info->sa_sigaction->siginfo_t->si_pid;
-
-//   char* message = "\nterminated by signal 9 \n";
-//   write(STDOUT_FILENO, message, 25);
-  
-//   // printf("sigterm number %d , info.. ", signo);
-// }
-
 /*
   init function for pid children in background
   Adapted from provided content
@@ -221,8 +165,6 @@ struct command_line *parse_input()
 	fflush(stdout);
 	fgets(input, INPUT_LENGTH, stdin);
 
-  // printf("input len %ld ;;", strlen(input));
-  // printf("input[0]: %s ;;", &input[0] );
   if (!strcmp(&input[0] , "\n")) { // ! is providing this is true
     curr_command->new_ln = true;
     return curr_command;
@@ -288,17 +230,13 @@ int main()
   // Signal hand
   struct sigaction SIGINT_action = {0};
   struct sigaction SIGTSTP_action = {0};
-  // struct sigaction SIGTERM_action = {0};
-  // struct sigaction SIGKILL_action = {0};
+
   struct sigaction ignore_action = {0};
 
   ignore_action.sa_handler = SIG_IGN;
-  // sigaction(SIGTERM, &ignore_action, NULL);
+
   sigaction(SIGINT, &ignore_action, NULL);
   sigaction(SIGTSTP, &ignore_action, NULL);
-
-  // sigaction(SIGTERM, &ignore_action, NULL);
-  // sigaction(SIGKILL, &ignore_action, NULL);
 
   init_bg_forks(&wait_bg_forks);
 
@@ -306,7 +244,6 @@ int main()
 	{
     // for all pending background processes
     for (int i = 0; i < (wait_bg_forks.count); i++) {
-      // wait_bg_forks->array[i] = wait_bg_forks->array[i+1];
       pid_t waitPid = wait_bg_forks.array[i];
       pid_t childPid = waitpid(waitPid, &childStatus, WNOHANG);
       if (childPid == waitPid) {
@@ -320,7 +257,6 @@ int main()
     }
 
     sigaction(SIGINT, &ignore_action, NULL);
-    // sigaction(SIGTSTP, &ignore_action, NULL);
 
     // handle SIGTSTP for PARENT PROCESS
     SIGTSTP_action.sa_handler = handle_SIGTSTP;
@@ -329,14 +265,6 @@ int main()
     // No flags set
     SIGTSTP_action.sa_flags = 0;
     sigaction(SIGTSTP, &SIGTSTP_action, NULL); // null ?
-
-    // // set sigterm  for background process
-    // SIGTERM_action.sa_handler = handle_SIGTERM;
-    // // // Block all catchable signals while handle_SIGTSTP is running
-    // sigfillset(&SIGTERM_action.sa_mask);
-    // // No flags set
-    // SIGTERM_action.sa_flags = 0;
-    // sigaction(SIGTERM, &SIGTERM_action, NULL); // null ?
 
     if (cntrl_z) {
       if (!fg_only) {
@@ -358,6 +286,7 @@ int main()
     if ( (curr_command->new_ln) ) { 
       // pass to new line on { \n } or { # }
       // printf("New line ;*) \n");
+      free(curr_command);
     } else if ( (curr_command->exit) ) { 
       // exit loop
       active_sh = false;
@@ -368,7 +297,7 @@ int main()
       } else {
         printf("terminated by signal 2 \n");
       }
-      // printf("exit value %d \n", exit_stat);
+      free(curr_command);
     } else if ( (curr_command->change_wd) ) { 
       // change working directory, set as PWD
       if (curr_command->argv[0]) {
@@ -377,8 +306,10 @@ int main()
         setenv("PWD", getenv("HOME"), 1);
       }
       chdir(getenv("PWD")); 
+      free(curr_command);
     } else if (cntrl_z) {
       // skip fork
+      free(curr_command);
     } else {
       // Executing Other Commands:
       // utilizing 3 built-in command by using fork(), exec() and waitpid()
@@ -388,6 +319,7 @@ int main()
 
       if (firstChild == -1) {
         perror("fork() failed!");
+        free(curr_command);
         exit(EXIT_FAILURE);
       } else if (firstChild == 0) {
         // This is the child fork process
@@ -401,15 +333,12 @@ int main()
         // if foreground, set handler SIGINT
         // if (!curr_command->is_bg) 
         {
-          // cntrl_c = false;
-          // sigaction(SIGINT, &SIGINT_action, NULL);
           SIGINT_action.sa_handler = handle_SIGINT;
           // // Block all catchable signals while handle_SIGINT is running
           // sigfillset(&SIGINT_action.sa_mask);
           // No flags set
           SIGINT_action.sa_flags = SIGCHLD;
           sigaction(SIGINT, &SIGINT_action, &ignore_action);
-          // cntrl_c = false;
         }
 
         // redirect I/O
@@ -418,6 +347,7 @@ int main()
           int sourceFD = open(curr_command->input_file, O_RDONLY);
           if (sourceFD == -1) { 
             perror("source open()");  // "cannot open %s for input", curr_command->input_file
+            free(curr_command);
             exit(1); 
           }
           fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
@@ -429,6 +359,7 @@ int main()
           int result = dup2(sourceFD, 0);
           if (result == -1) { 
             perror("source dup2()"); 
+            free(curr_command);
             exit(2); 
           }
         }
@@ -437,6 +368,7 @@ int main()
           int sourceFD = open("/dev/null", O_RDONLY);
           if (sourceFD == -1) { 
             perror("source open()"); 
+            free(curr_command);
             exit(1); 
           }
           fcntl(sourceFD, F_SETFD, FD_CLOEXEC);
@@ -444,6 +376,7 @@ int main()
           int result = dup2(sourceFD, 0);
           if (result == -1) { 
             perror("input /dev/null dup2()"); 
+            free(curr_command);
             exit(2); 
           }
         }
@@ -452,6 +385,7 @@ int main()
           int targetFD = open(curr_command->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
           if (targetFD == -1) { 
             perror("target open()"); 
+            free(curr_command);
             exit(1); 
           }
 
@@ -464,6 +398,7 @@ int main()
           int result = dup2(targetFD, 1);
           if (result == -1) { 
             perror("target dup2()"); 
+            free(curr_command);
             exit(2); 
           }
         }
@@ -472,6 +407,7 @@ int main()
           int targetFD = open("/dev/null", O_WRONLY | O_CREAT | O_TRUNC, 0644);
           if (targetFD == -1) { 
             perror("target open()"); 
+            free(curr_command);
             exit(1); 
           }
           fcntl(targetFD, F_SETFD, FD_CLOEXEC);
@@ -479,6 +415,7 @@ int main()
           int result = dup2(targetFD, 1);
           if (result == -1) { 
             perror("target dup2()"); 
+            free(curr_command);
             exit(2); 
           }
         }
@@ -488,11 +425,14 @@ int main()
 
         /* execve() returns only on error */
         perror(curr_command->argv[0]);
+        // free command on error
+        // free(curr_command->input_file);
+        // free(curr_command->output_file);
+        // free(curr_command->argv);
+        free(curr_command);
         exit(EXIT_FAILURE);
       } else {
         // this is to wait for the fork first child to finish/ return, passing the firstChild PID value
-        
-        // sigaction(SIGINT, &ignore_action, NULL);
 
         // if foreground process (NOT background), wait for complete
         if (!curr_command->is_bg) {
@@ -511,22 +451,17 @@ int main()
 
           // set status from finished FOREGROUND command
           exit_stat =  WEXITSTATUS(childStatus);
-
-          
         }
         // else if background process, proceed. 
         else if (curr_command->is_bg) {
           printf("background pid is %d \n", firstChild);
-          // pid_t childPid = waitpid(firstChild, &childStatus, 0);
-          // printf("background pid %d is done: terminated by signal %d \n", childPid, WEXITSTATUS(childStatus));
-          // waitChild = firstChild;
           addBgProcess(&wait_bg_forks, firstChild);
         }
-      // free(curr_command->argv);
       free(curr_command);
       }
     }
 	}
+  free(curr_command);
   free(wait_bg_forks.array);
 	return EXIT_SUCCESS;
 }
